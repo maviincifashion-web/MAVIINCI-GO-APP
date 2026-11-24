@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MAVIINCI FARM</string>
+    <string name="title_activity_main">MAVIINCI FARM</string>
+    <string name="package_name">in.maviinci.farm</string>
+    <string name="custom_url_scheme">in.maviinci.farm</string>
+</resources>
