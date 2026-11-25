@@ -6,7 +6,7 @@ import { TopBar } from "../ui";
 
 /** More: website outfits, materials and templates at a glance, and the phone's settings. */
 export default function More() {
-  const { push, state } = useStore();
+  const { push, state, route } = useStore();
   const [mats, setMats] = useState<StudioMaterial[]>([]);
   const [tpls, setTpls] = useState<Template[]>([]);
   useEffect(() => { api.materials().then(setMats).catch(() => {}); api.templates().then(setTpls).catch(() => {}); }, []);
@@ -30,7 +30,7 @@ export default function More() {
         </div>
         <div className="glbl">This phone</div>
         <div className="set">
-          <button className="r" onClick={() => push({ name: "settings" })}><Icon name="wifi" /><div>Connection<small>{c ? `${c.pc} · ${c.base.replace(/^https?:\/\//, "")}` : "Not paired"}</small></div><Icon name="chev" size={16} /></button>
+          <button className="r" onClick={() => push({ name: "settings" })}><Icon name="wifi" /><div>Connection<small>{route === "lan" ? `Office Wi-Fi · ${c?.lan?.pc}` : route === "cloud" ? `Anywhere · ${c?.cloud?.email}` : "Not connected"}</small></div><Icon name="chev" size={16} /></button>
         </div>
         <div className="sub" style={{ textAlign: "center", marginTop: 8 }}>MAVIINCI FARM mobile · farm app v{state?.version || "?"}</div>
       </div>

@@ -8,7 +8,7 @@ import { setConn } from "./api";
 if (import.meta.env.DEV && location.hash.includes("pair=")) {
   const h = new URLSearchParams(location.hash.slice(1));
   const [base, token] = (h.get("pair") || "").split("|");
-  setConn({ base, token, pc: "dev", device: "dev" });
+  setConn({ device: "dev", lan: { base, token, pc: "dev" } });
   (window as unknown as { __dev: URLSearchParams }).__dev = h;
 }
 

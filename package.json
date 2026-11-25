@@ -1,7 +1,7 @@
 {
   "name": "maviinci-farm-mobile",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MAVIINCI FARM mobile: watch the render farm, approve renders and hand out work from a phone",
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.0.0",
     "@capacitor/core": "^8.6.0",
+    "firebase": "^12.19.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

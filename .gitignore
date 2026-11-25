@@ -8,3 +8,4 @@ android/app/src/main/assets/public/
 *.keystore
 *.jks
 .DS_Store
+src/firebase.config.json

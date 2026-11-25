@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { App as Cap } from "@capacitor/app";
-import { getConn, setConn } from "./api";
+import { api, pickRoute } from "./api";
+import { auth } from "./cloud";
 import { Icon, IconName } from "./icons";
 import { StoreProvider, Tab, useStore } from "./store";
 import Connect from "./screens/Connect";
@@ -16,17 +17,31 @@ import Website from "./screens/Website";
 import SettingsScreen from "./screens/Settings";
 
 export default function App() {
-  const [paired, setPaired] = useState(!!getConn());
+  const [ready, setReady] = useState(false);
+  const [paired, setPaired] = useState(false);
+  const [gen, setGen] = useState(0);          // remounts the store when the way to the farm changes
+  const [why, setWhy] = useState("");
   const [toast, setToast] = useState("");
   const timer = useRef(0);
   const show = useCallback((t: string) => { setToast(t); clearTimeout(timer.current); timer.current = window.setTimeout(() => setToast(""), 3200); }, []);
-  const unpaired = useCallback(() => { setConn(null); setPaired(false); }, []);
 
+  // the sign-in is kept on the phone; wait for it, then pick the office Wi-Fi or Firebase
+  useEffect(() => { (async () => { await auth.authStateReady(); setPaired(!!(await pickRoute())); setReady(true); })(); }, []);
+
+  // a login the farm refuses is signed out; a removed office pairing is forgotten; another way may still work
+  const unpaired = useCallback(async (msg?: string) => {
+    if (msg) await api.signOut().catch(() => {}); else await api.forgetLan();
+    if (await pickRoute()) { setGen((g) => g + 1); return; }
+    setWhy(msg || "This phone was removed from the farm. Connect again.");
+    setPaired(false);
+  }, []);
+
+  if (!ready) return <div className="app" style={{ display: "grid", placeItems: "center" }}><span className="spin" /></div>;
   return (
     <>
       {paired
-        ? <StoreProvider onUnpaired={unpaired} onToast={show}><Shell /></StoreProvider>
-        : <Connect onPaired={() => setPaired(true)} />}
+        ? <StoreProvider key={gen} onUnpaired={unpaired} onToast={show}><Shell /></StoreProvider>
+        : <Connect why={why} onPaired={() => { setWhy(""); setGen((g) => g + 1); setPaired(true); }} />}
       {toast && <div className="toast" onClick={() => setToast("")}>{toast}</div>}
     </>
   );
