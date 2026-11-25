@@ -3,10 +3,12 @@ import { api, img, Job, LibraryFabric, LiveOutfit, StudioMaterial, Template } fr
 import { useStore } from "../store";
 import { TopBar } from "../ui";
 
-type Garment = "kurta" | "pajama" | "kurta+pajama";
+type Garment = "kurta" | "pajama" | "sadri" | "kurta+pajama";
+const GLABEL: Record<string, string> = { kurta: "Kurta", pajama: "Pajama", sadri: "Sadri" };
 const PARTS: Record<Garment, [string, string][]> = {
   kurta: [["kurta", "Model layers"], ["kurta_fold", "Folded photos"]],
   pajama: [["pajama", "Pajama layers + style photos"]],
+  sadri: [["sadri", "Sadri layers + buttons"], ["sadri_icon", "Button photo"]],
   "kurta+pajama": [["kurta", "Kurta model layers"], ["kurta_fold", "Kurta folded photos"], ["pajama", "Pajama layers + style photos"]],
 };
 
@@ -42,7 +44,7 @@ export default function NewJob() {
   }, []);
 
   // each website outfit this job makes, and the live outfits of the picked fabric
-  const groups: [string, string][] = garment === "kurta+pajama" ? [["kurta", "Kurta"], ["pajama", "Pajama"]] : [["main", garment === "pajama" ? "Pajama" : "Kurta"]];
+  const groups: [string, string][] = garment === "kurta+pajama" ? [["kurta", "Kurta"], ["pajama", "Pajama"]] : [["main", GLABEL[garment] || "Kurta"]];
   const matchesOf = (g: string) => !fab ? [] : live
     .filter((o) => o.garment === g && (o.fabricID ? o.fabricID === fab.id : o.fabric.toLowerCase() === fab.name.trim().toLowerCase()))
     .sort((a, b) => b.created - a.created);
@@ -73,7 +75,7 @@ export default function NewJob() {
   const missingTpl = (garment === "kurta+pajama" ? ["kurta", "pajama"] : [garment]).filter((k) => tpls.length && !tpls.some((t) => t.key === k));
   const farm = state?.farm || [];
   const parts = PARTS[garment];
-  const hasPajama = garment !== "kurta";
+  const hasPajama = garment === "pajama" || garment === "kurta+pajama";
   const needPrice = !target(groups[0][0]) && !price.trim();
   const needPprice = garment === "kurta+pajama" && !target("pajama") && !pprice.trim();
   const ok = !!material && !!name.trim() && !needPrice && !needPprice && !missingTpl.length;
@@ -102,7 +104,7 @@ export default function NewJob() {
       <div className="body">
         <div className="glbl">Garment</div>
         <div className="gm">
-          {([["kurta", "Kurta"], ["pajama", "Pajama"], ["kurta+pajama", "Kurta + Pajama"]] as [Garment, string][]).map(([k, l]) => (
+          {([["kurta", "Kurta"], ["pajama", "Pajama"], ["sadri", "Sadri"], ["kurta+pajama", "Kurta + Pajama"]] as [Garment, string][]).map(([k, l]) => (
             <button key={k} className={garment === k ? "on" : ""} onClick={() => setGarment(k)}>{l}</button>
           ))}
         </div>
@@ -158,7 +160,7 @@ export default function NewJob() {
         })}
         <label className="field">Fabric name on the website<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <div className="g2">
-          <label className="field">{garment === "pajama" ? "Price (₹)" : "Kurta price (₹)"}{target(groups[0][0]) ? ` · live ₹${byId(target(groups[0][0]))?.price || "—"}` : ""}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
+          <label className="field">{garment === "kurta+pajama" ? "Kurta price (₹)" : `${GLABEL[garment]} price (₹)`}{target(groups[0][0]) ? ` · live ₹${byId(target(groups[0][0]))?.price || "—"}` : ""}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
           {garment === "kurta+pajama"
             ? <label className="field">Pajama price (₹){target("pajama") ? ` · live ₹${byId(target("pajama"))?.price || "—"}` : ""}<input inputMode="numeric" value={pprice} onChange={(e) => setPprice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
             : <label className="field">Discount (%)<input inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ""))} /></label>}
