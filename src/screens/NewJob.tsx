@@ -42,7 +42,7 @@ export default function NewJob() {
   }, []);
 
   // each website outfit this job makes, and the live outfits of the picked fabric
-  const groups: [string, string][] = garment === "kurta+pajama" ? [["main", "Kurta"], ["pajama", "Pajama"]] : [["main", garment === "pajama" ? "Pajama" : "Kurta"]];
+  const groups: [string, string][] = garment === "kurta+pajama" ? [["kurta", "Kurta"], ["pajama", "Pajama"]] : [["main", garment === "pajama" ? "Pajama" : "Kurta"]];
   const matchesOf = (g: string) => !fab ? [] : live
     .filter((o) => o.garment === g && (o.fabricID ? o.fabricID === fab.id : o.fabric.toLowerCase() === fab.name.trim().toLowerCase()))
     .sort((a, b) => b.created - a.created);
@@ -74,7 +74,7 @@ export default function NewJob() {
   const farm = state?.farm || [];
   const parts = PARTS[garment];
   const hasPajama = garment !== "kurta";
-  const needPrice = !target("main") && !price.trim();
+  const needPrice = !target(groups[0][0]) && !price.trim();
   const needPprice = garment === "kurta+pajama" && !target("pajama") && !pprice.trim();
   const ok = !!material && !!name.trim() && !needPrice && !needPprice && !missingTpl.length;
   const shownMats = allMats ? mats : mats.slice(0, 12);
@@ -158,7 +158,7 @@ export default function NewJob() {
         })}
         <label className="field">Fabric name on the website<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <div className="g2">
-          <label className="field">{garment === "pajama" ? "Price (₹)" : "Kurta price (₹)"}{target("main") ? ` · live ₹${byId(target("main"))?.price || "—"}` : ""}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
+          <label className="field">{garment === "pajama" ? "Price (₹)" : "Kurta price (₹)"}{target(groups[0][0]) ? ` · live ₹${byId(target(groups[0][0]))?.price || "—"}` : ""}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
           {garment === "kurta+pajama"
             ? <label className="field">Pajama price (₹){target("pajama") ? ` · live ₹${byId(target("pajama"))?.price || "—"}` : ""}<input inputMode="numeric" value={pprice} onChange={(e) => setPprice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
             : <label className="field">Discount (%)<input inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ""))} /></label>}
