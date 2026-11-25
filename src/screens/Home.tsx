@@ -49,10 +49,16 @@ export default function Home() {
             return (
               <div className="pc" key={f.name} onClick={() => job && push({ name: "job", id: job.id })}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><b>{f.name}</b><span className={`tag ${tag[0]}`}>{tag[1]}</span></div>
-                <Ring pct={pct}><div className="s" style={swatch(job)}>{!job && <Icon name="power" size={18} />}</div></Ring>
+                <Ring pct={pct}>
+                  <div className={`s${job ? "" : ` ${tag[0]}`}`} style={swatch(job)}>
+                    {!job && <Icon name={tag[0] === "idle" ? "check" : tag[0] === "paused" ? "clock" : "power"} size={22} />}
+                  </div>
+                </Ring>
                 {job ? <div><small style={{ color: "var(--ink)", fontWeight: 600 }}>{jobName(job)}</small>
                   <small>{partNameByKey(job, f.part)} · {Math.round(pct * 100)}%</small><small>{eta(st) || stageLabel(st?.progress?.stage)}</small></div>
-                  : <div><small>{short(f.gpu) || "—"}</small><small>{f.online ? (f.gpuStats ? `${f.gpuStats.temp}° · ${f.gpuStats.util}%` : "waiting for work") : `seen ${ago(f.time)}`}</small></div>}
+                  : <div><small style={{ color: "var(--ink2)", fontWeight: 600 }}>{!f.online ? "Offline" : tag[0] === "idle" ? "Ready for work" : "Not taking jobs"}</small>
+                    <small>{short(f.gpu) || "—"}{f.online && f.gpuStats ? ` · ${f.gpuStats.temp}°` : ""}</small>
+                    {!f.online && <small>seen {ago(f.time)}</small>}</div>}
               </div>
             );
           })}
@@ -61,7 +67,7 @@ export default function Home() {
 
         {latest && (
           <div className="card" onClick={() => push({ name: "job", id: latest.id })}>
-            <div className="ct">Latest look<small>{jobName(latest)} · <StatusPill job={latest} /></small></div>
+            <div className="ct">Latest look<small>{jobName(latest)} · <span className={`st ${latest.status === "done" ? "ok" : "warn"}`}>{latest.status === "done" ? "Live" : "Review"}</span></small></div>
             <LatestLooks id={latest.id} />
           </div>
         )}

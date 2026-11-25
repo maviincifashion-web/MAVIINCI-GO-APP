@@ -30,7 +30,7 @@ export interface State { pc: string; version: string; time: number; uploadMode: 
 export interface StudioMaterial { slug: string; name: string; material: string; version: number; hasSwatch: boolean }
 export interface Template { key: string; name: string; recipe: string; active: number }
 export interface LibraryFabric { id: string; name: string; brand: string; src: string; colorCode: string }
-export interface LiveOutfit { garment: string; id: string; fabric: string; fabricImg: string; price: string; created: number; updated: number; madeBy: string; studioJob: string }
+export interface LiveOutfit { garment: string; id: string; fabric: string; fabricID?: string; fabricImg: string; price: string; created: number; updated: number; madeBy: string; studioJob: string }
 
 // ---- the connection ----
 export interface Lan { base: string; token: string; pc: string }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, img, LibraryFabric, StudioMaterial, Template } from "../api";
+import { api, img, Job, LibraryFabric, LiveOutfit, StudioMaterial, Template } from "../api";
 import { useStore } from "../store";
 import { TopBar } from "../ui";
 
@@ -10,7 +10,8 @@ const PARTS: Record<Garment, [string, string][]> = {
   "kurta+pajama": [["kurta", "Kurta model layers"], ["kurta_fold", "Kurta folded photos"], ["pajama", "Pajama layers + style photos"]],
 };
 
-/** A new job from a material that is already in the studio (materials are made in the Lab on a PC). */
+/** A new job from a material that is already in the studio (materials are made in the Lab on a PC).
+ *  Picking a fabric whose outfit is already on the website edits that outfit (same rule as the desktop New job). */
 export default function NewJob() {
   const { state, pop, push, toast, refresh } = useStore();
   const [mats, setMats] = useState<StudioMaterial[]>([]);
@@ -30,12 +31,35 @@ export default function NewJob() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [allMats, setAllMats] = useState(false);
+  const [live, setLive] = useState<LiveOutfit[]>([]);
+  const [targets, setTargets] = useState<Record<string, string>>({});   // group -> outfit id to edit ("" = new outfit)
 
   useEffect(() => {
     api.materials().then(setMats).catch((e) => setErr(String(e.message || e)));
     api.templates().then(setTpls).catch(() => {});
     api.fabrics().then((r) => setLib(r.fabrics || [])).catch(() => {});
+    api.outfits().then((r) => setLive(r.outfits || [])).catch(() => {});
   }, []);
+
+  // each website outfit this job makes, and the live outfits of the picked fabric
+  const groups: [string, string][] = garment === "kurta+pajama" ? [["main", "Kurta"], ["pajama", "Pajama"]] : [["main", garment === "pajama" ? "Pajama" : "Kurta"]];
+  const matchesOf = (g: string) => !fab ? [] : live
+    .filter((o) => o.garment === g && (o.fabricID ? o.fabricID === fab.id : o.fabric.toLowerCase() === fab.name.trim().toLowerCase()))
+    .sort((a, b) => b.created - a.created);
+  const matchKey = groups.map(([k, g]) => `${k}:${matchesOf(g).map((o) => o.id).join(",")}`).join("|");
+  useEffect(() => {
+    const t: Record<string, string> = {};
+    for (const [k, g] of groups) {
+      const m = matchesOf(g)[0];
+      t[k] = m ? m.id : "";
+      if (m?.price) (k === "pajama" ? setPprice : setPrice)(String(m.price));
+    }
+    setTargets(t);
+  }, [matchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const target = (k: string) => targets[k] || "";
+  const isUpdate = groups.some(([k]) => target(k));
+  const byId = (id: string) => live.find((o) => o.id === id);
+  const busyFor = (id: string): Job | undefined => (state?.jobs || []).find((j) => j.update?.outfits && Object.values(j.update.outfits).includes(id) && ["queued", "running", "review", "uploading"].includes(j.status));
 
   const material = mats.find((m) => m.slug === mat);
   const pickMat = (m: StudioMaterial) => {
@@ -50,7 +74,9 @@ export default function NewJob() {
   const farm = state?.farm || [];
   const parts = PARTS[garment];
   const hasPajama = garment !== "kurta";
-  const ok = !!material && !!name.trim() && !!price.trim() && (garment !== "kurta+pajama" || !!pprice.trim()) && !missingTpl.length;
+  const needPrice = !target("main") && !price.trim();
+  const needPprice = garment === "kurta+pajama" && !target("pajama") && !pprice.trim();
+  const ok = !!material && !!name.trim() && !needPrice && !needPprice && !missingTpl.length;
   const shownMats = allMats ? mats : mats.slice(0, 12);
 
   const create = async () => {
@@ -60,9 +86,10 @@ export default function NewJob() {
       const j = await api.createJob({
         garment, materialSlug: mat, fabricName: name.trim(), fabricLibraryId: fab?.id, price: price.trim(),
         pajamaPrice: garment === "kurta+pajama" ? pprice.trim() : undefined, discount: discount.trim() || undefined,
-        quality, uploadMode: mode, assign: Object.keys(a).length ? a : null,
+        quality, uploadMode: isUpdate ? "review" : mode, assign: Object.keys(a).length ? a : null,
+        ...(isUpdate ? { update: Object.fromEntries(groups.map(([k]) => [k, target(k)]).filter(([, id]) => id)) } : {}),
       });
-      toast(`${name.trim()} is in the queue`);
+      toast(isUpdate ? `${name.trim()}: re-render queued, waits in Review` : `${name.trim()} is in the queue`);
       await refresh();
       pop(); push({ name: "job", id: j.id });
     } catch (e) { setErr(String((e as Error).message || e)); }
@@ -100,18 +127,40 @@ export default function NewJob() {
         {q && (
           <div className="list">
             {shownLib.map((f) => (
-              <button key={f.id} className={fab?.id === f.id ? "on" : ""} onClick={() => { setFab(f); setName(f.name); setQ(""); }}>
+              <button key={f.id} className={fab?.id === f.id ? "on" : ""} onClick={() => {
+                setFab(f); setName(f.name); setQ("");
+                const m = !mat && mats.find((x) => x.name.trim().toLowerCase() === f.name.trim().toLowerCase());   // the material named after it
+                if (m) setMat(m.slug);
+              }}>
                 <i style={f.src ? { backgroundImage: `url("${f.src}")` } : {}} /><div><b style={{ fontSize: 13 }}>{f.name}</b><small>{[f.brand, f.colorCode].filter(Boolean).join(" · ")}</small></div>
               </button>
             ))}
             {!shownLib.length && <div className="sub" style={{ padding: 10 }}>No fabric matches.</div>}
           </div>
         )}
+        {groups.map(([k, g]) => {
+          const ms = matchesOf(g); if (!ms.length) return null;
+          const cur = byId(target(k)); const bj = cur ? busyFor(cur.id) : undefined;
+          return (
+            <div key={k} className={`edit${target(k) ? " on" : ""}`}>
+              <div className="eh">
+                <i style={(cur || ms[0]).fabricImg ? { backgroundImage: `url("${(cur || ms[0]).fabricImg}")` } : {}} />
+                <div><b>{target(k) ? `Edits the live ${g.toLowerCase()} outfit` : `Makes a new ${g.toLowerCase()} outfit`}</b>
+                  <small>{target(k) ? "New photos replace the live ones after approval in Review. Old photos are kept." : `This fabric already has a ${g.toLowerCase()} outfit on the website.`}</small>
+                  {bj && <small style={{ color: "var(--warn)" }}>A re-render of it is already {bj.status === "review" ? "waiting in Review" : bj.status}.</small>}</div>
+              </div>
+              <select value={target(k)} onChange={(e) => setTargets({ ...targets, [k]: e.target.value })}>
+                {ms.map((o) => <option key={o.id} value={o.id}>Edit {o.id} · ₹{o.price || "—"}</option>)}
+                <option value="">New outfit instead</option>
+              </select>
+            </div>
+          );
+        })}
         <label className="field">Fabric name on the website<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <div className="g2">
-          <label className="field">{garment === "pajama" ? "Price (₹)" : "Kurta price (₹)"}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
+          <label className="field">{garment === "pajama" ? "Price (₹)" : "Kurta price (₹)"}{target("main") ? ` · live ₹${byId(target("main"))?.price || "—"}` : ""}<input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
           {garment === "kurta+pajama"
-            ? <label className="field">Pajama price (₹)<input inputMode="numeric" value={pprice} onChange={(e) => setPprice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
+            ? <label className="field">Pajama price (₹){target("pajama") ? ` · live ₹${byId(target("pajama"))?.price || "—"}` : ""}<input inputMode="numeric" value={pprice} onChange={(e) => setPprice(e.target.value.replace(/[^\d.]/g, ""))} /></label>
             : <label className="field">Discount (%)<input inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ""))} /></label>}
         </div>
 
@@ -133,23 +182,23 @@ export default function NewJob() {
         {hasPajama && quality === "final" && <div className="info">A pajama at Final quality renders 110 photos and takes a few hours.</div>}
 
         <div className="glbl">Publishing</div>
-        <div className="seg">
-          <button className={mode === "auto" ? "on" : ""} onClick={() => setMode("auto")}>When checks pass</button>
-          <button className={mode === "review" ? "on" : ""} onClick={() => setMode("review")}>After review</button>
-        </div>
+        {isUpdate ? <div className="info">An edit of a live outfit always waits for approval in Review.</div> : (
+          <div className="seg">
+            <button className={mode === "auto" ? "on" : ""} onClick={() => setMode("auto")}>When checks pass</button>
+            <button className={mode === "review" ? "on" : ""} onClick={() => setMode("review")}>After review</button>
+          </div>
+        )}
 
         <div className="card">
           <div className="ct">This job makes</div>
           <div className="sub" style={{ color: "var(--ink2)" }}>
-            {garment === "kurta" && "1 kurta outfit (model layers + folded photos) and its fabric button."}
-            {garment === "pajama" && "1 pajama outfit (96 model layers + 14 style photos) and its fabric button."}
-            {garment === "kurta+pajama" && "2 outfits: a kurta and a pajama in the same fabric, each with its own button."}
-            {" "}{mode === "auto" ? "It goes live as soon as every check passes." : "It waits in Review."}
+            {groups.map(([k, g]) => target(k) ? `New photos for ${target(k)} (${g.toLowerCase()}). ` : `A new ${g.toLowerCase()} outfit and its fabric button. `)}
+            {isUpdate || mode === "review" ? "It waits in Review." : "It goes live as soon as every check passes."}
           </div>
         </div>
         {err && <div className="err">{err}</div>}
-        <button className="btn gold" disabled={!ok || busy} onClick={create}>{busy ? <span className="spin" /> : "Add to queue"}</button>
-        {!ok && <div className="sub" style={{ textAlign: "center" }}>{!material ? "Pick a material." : !name.trim() ? "Enter the fabric name." : !price.trim() ? "Enter the price." : garment === "kurta+pajama" && !pprice.trim() ? "Enter the pajama price." : ""}</div>}
+        <button className="btn gold" disabled={!ok || busy} onClick={create}>{busy ? <span className="spin" /> : isUpdate ? "Re-render and edit" : "Add to queue"}</button>
+        {!ok && <div className="sub" style={{ textAlign: "center" }}>{!material ? "Pick a material." : !name.trim() ? "Enter the fabric name." : needPrice ? "Enter the price." : needPprice ? "Enter the pajama price." : ""}</div>}
       </div>
     </>
   );
